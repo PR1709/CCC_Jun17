@@ -1,18 +1,17 @@
 :root {
-  --text: #4b5563;
+  --text: #444b57;
   --text-h: #111827;
-  --bg: #f4f7fb;
+  --bg: #f6f7f9;
   --surface: #ffffff;
-  --panel: #f8fafc;
-  --card: #fbfdff;
-  --border: #dbe3ed;
-  --accent: #0f766e;
-  --shadow:
-    rgba(15, 23, 42, 0.08) 0 18px 40px -24px, rgba(15, 23, 42, 0.12) 0 8px 18px -14px;
+  --panel: #ffffff;
+  --card: #ffffff;
+  --border: #d7dce3;
+  --accent: #111827;
+  --shadow: none;
 
   --sans: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
 
-  font: 18px/145% var(--sans);
+  font: 16px/1.6 var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light;
   color: var(--text);
@@ -23,7 +22,7 @@
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: 16px;
+    font-size: 15px;
   }
 }
 
