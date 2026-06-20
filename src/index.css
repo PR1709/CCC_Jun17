@@ -1,15 +1,16 @@
+@import "tailwindcss";
 :root {
-  --text: #444b57;
-  --text-h: #111827;
-  --bg: #f6f7f9;
-  --surface: #ffffff;
+  --text: #e2e8f0;
+  --text-h: #f8fafc;
+  --bg: #0b1220;
+  --surface: #111827;
   --panel: #ffffff;
   --card: #ffffff;
-  --border: #d7dce3;
-  --accent: #111827;
+  --border: #1f2937;
+  --accent: #60a5fa;
   --shadow: none;
 
-  --sans: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   font: 16px/1.6 var(--sans);
   letter-spacing: 0.18px;
@@ -28,6 +29,8 @@
 
 body {
   margin: 0;
+  min-width: 320px;
+  background: var(--bg);
 }
 
 #root {
@@ -60,4 +63,10 @@ p {
 
 a {
   color: inherit;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }

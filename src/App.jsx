@@ -1,70 +1,254 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+const apiBase = import.meta.env.VITE_API_BASE_URL || '/api'
+
+const resourceMeta = {
+    users: {
+        title: 'Users',
+        color: 'linear-gradient(135deg, #1f3c88, #4e54c8)',
+        fields: ['name', 'email', 'phone', 'address'],
+        empty: { name: '', email: '', phone: '', address: '' },
+    },
+    products: {
+        title: 'Products',
+        color: 'linear-gradient(135deg, #0f766e, #14b8a6)',
+        fields: ['name', 'description', 'price', 'quantity', 'category'],
+        empty: { name: '', description: '', price: '', quantity: '', category: '' },
+    },
+    orders: {
+        title: 'Orders',
+        color: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+        fields: ['userId', 'products', 'totalAmount', 'status'],
+        empty: { userId: '', products: '', totalAmount: '', status: 'pending' },
+    },
+}
+
+const pretty = (value) => {
+    if (value === null || value === undefined) return '—'
+    if (typeof value === 'string') return value
+    return JSON.stringify(value, null, 2)
+}
+
 function App() {
-  return (
-    <>
-      <header className="topbar">
-        <a className="brand" href="#hero">
-          CCC Jun17
-        </a>
+    const [resource, setResource] = useState('users')
+    const [items, setItems] = useState([])
+    const [form, setForm] = useState(resourceMeta.users.empty)
+    const [selectedId, setSelectedId] = useState('')
+    const [status, setStatus] = useState('Connecting to API...')
+    const [loading, setLoading] = useState(false)
 
-        <nav aria-label="Primary" className="topnav">
-          <a href="#hero">Hero</a>
-          <a href="#testimonial">Testimonial</a>
-          <a href="#mission">Mission</a>
-          <a href="#about">About</a>
-          <a href="#contact">Contact Us</a>
-        </nav>
-      </header>
+    const active = resourceMeta[resource]
 
-      <main className="page-shell">
-        <section className="section hero-section" id="hero">
-          <p className="section-label">Hero</p>
-          <h1>Simple pages for clear messaging.</h1>
-          <p className="lead">
-            A clean, basic layout with a small navbar and the core sections kept in place.
-          </p>
-        </section>
+useEffect(() => {
+    // Reset form when resource changes - this is safe for initialization
+    const empty = resourceMeta[resource].empty
+    setForm(empty)
+    setSelectedId('')
+  }, [resource]) // Dependency on resource is intentional
+const loadItems = async (nextResource = resource) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`${apiBase}/${nextResource}`)
+      const data = await response.json()
+      setItems(Array.isArray(data) ? data : [])
+      setStatus(response.ok ? `Loaded ${nextResource}` : data?.message || 'Request failed')
+    } catch {
+      setStatus('API unavailable. Start the server and MongoDB.')
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-        <section className="section" id="testimonial">
-          <p className="section-label">Testimonial</p>
-          <blockquote>
-            "The layout is easy to scan and gets the point across without extra noise."
-          </blockquote>
-          <p className="quote-source">Alex, project lead</p>
-        </section>
+    useEffect(() => {
+    // Fetch on resource change
+    const fetchData = async () => {
+      await loadItems(resource)
+    }
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource])
+    const totals = useMemo(
+        () => ({
+            users: items.length,
+            products: items.length,
+            orders: items.length,
+        }),
+        [items],
+    )
 
-        <section className="section" id="mission">
-          <p className="section-label">Mission</p>
-          <h2>Keep the interface plain, useful, and easy to maintain.</h2>
-          <p>
-            The goal is to present the information clearly with simple sections, modest spacing,
-            and no extra decoration.
-          </p>
-        </section>
+    const handleChange = (event) => {
+        const { name, value } = event.target
+        setForm((current) => ({ ...current, [name]: value }))
+    }
 
-        <section className="section" id="about">
-          <p className="section-label">About</p>
-          <h2>What this page includes</h2>
-          <ul className="simple-list">
-            <li>A minimal top navbar</li>
-            <li>Four short content sections</li>
-            <li>Basic spacing and borders</li>
-          </ul>
-        </section>
+    const submit = async (event) => {
+        event.preventDefault()
+        const payload = { ...form }
 
-        <section className="section contact-section" id="contact">
-          <div>
-            <p className="section-label">Contact Us</p>
-            <h2>Reach out for a simple, focused build.</h2>
-          </div>
-          <a className="contact-link" href="mailto:hello@example.com">
-            hello@example.com
-          </a>
-        </section>
-      </main>
-    </>
-  )
+        if (resource === 'products') {
+            payload.price = Number(payload.price)
+            payload.quantity = Number(payload.quantity)
+        }
+
+        if (resource === 'orders') {
+            payload.totalAmount = Number(payload.totalAmount)
+            payload.products = payload.products
+                .split(',')
+                .map((entry) => entry.trim())
+                .filter(Boolean)
+                .map((entry) => {
+                    const [productId = '', quantity = '1', price = '0'] = entry.split('|')
+                    return { productId: productId.trim(), quantity: Number(quantity), price: Number(price) }
+                })
+        }
+
+        const method = selectedId ? 'PUT' : 'POST'
+        const path = selectedId ? `${apiBase}/${resource}/${selectedId}` : `${apiBase}/${resource}`
+
+        try {
+            const response = await fetch(path, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            const data = await response.json()
+            setStatus(data?.message || `${method} ${resource} complete`)
+            if (response.ok) {
+                setForm(resourceMeta[resource].empty)
+                setSelectedId('')
+                loadItems()
+            }
+        } catch {
+            setStatus('Could not reach the API')
+        }
+    }
+
+    const remove = async (id) => {
+        try {
+            await fetch(`${apiBase}/${resource}/${id}`, { method: 'DELETE' })
+            setStatus(`${resourceMeta[resource].title} deleted`)
+            loadItems()
+        } catch {
+            setStatus('Delete failed')
+        }
+    }
+
+    return (
+        <main className="app-shell">
+            <section className="hero">
+                <div className="hero-copy">
+                    <p className="eyebrow">MERN CRUD dashboard</p>
+                    <h1>Manage users, products, and orders from one clean interface.</h1>
+                    <p className="subcopy">
+                        The backend uses Express, Mongoose, and MongoDB at {apiBase}. Create, edit, and delete
+                        records with live API calls.
+                    </p>
+                    <div className="hero-badges">
+                        <span>{status}</span>
+                        <span>{totals[resource]} loaded</span>
+                    </div>
+                </div>
+                <div className="hero-card" style={{ background: active.color }}>
+                    <span>{active.title}</span>
+                    <strong>{loading ? 'Refreshing...' : `${items.length} records`}</strong>
+                    <small>Connected to the API layer</small>
+                </div>
+            </section>
+
+            <section className="resource-switcher">
+                {Object.entries(resourceMeta).map(([key, meta]) => (
+                    <button
+                        key={key}
+                        className={key === resource ? 'switch active' : 'switch'}
+                        onClick={() => setResource(key)}
+                        type="button"
+                    >
+                        {meta.title}
+                    </button>
+                ))}
+            </section>
+
+            <section className="layout-grid">
+                <form className="panel form-panel" onSubmit={submit}>
+                    <div className="panel-head">
+                        <h2>{selectedId ? `Update ${active.title.slice(0, -1)}` : `Create ${active.title.slice(0, -1)}`}</h2>
+                        <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => {
+                                setForm(active.empty)
+                                setSelectedId('')
+                            }}
+                        >
+                            Reset
+                        </button>
+                    </div>
+                    {active.fields.map((field) => (
+                        <label key={field}>
+                            <span>{field}</span>
+                            {field === 'products' ? (
+                                <textarea
+                                    name={field}
+                                    value={form[field]}
+                                    onChange={handleChange}
+                                    placeholder="productId|quantity|price, productId|quantity|price"
+                                    rows="4"
+                                />
+                            ) : (
+                                <input
+                                    name={field}
+                                    value={form[field]}
+                                    onChange={handleChange}
+                                    placeholder={field}
+                                />
+                            )}
+                        </label>
+                    ))}
+                    <button className="primary" type="submit">
+                        {selectedId ? 'Update record' : 'Create record'}
+                    </button>
+                </form>
+
+                <div className="panel list-panel">
+                    <div className="panel-head">
+                        <h2>{active.title} records</h2>
+                        <button type="button" className="ghost" onClick={() => loadItems()}>
+                            Refresh
+                        </button>
+                    </div>
+                    <div className="cards">
+                        {items.map((item) => (
+                            <article key={item._id} className="record-card">
+                                <div className="record-top">
+                                    <strong>{item.name || item.status || item._id}</strong>
+                                    <span>{item._id}</span>
+                                </div>
+                                <pre>{pretty(item)}</pre>
+                                <div className="record-actions">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedId(item._id)
+                                            setForm({ ...active.empty, ...item })
+                                        }}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button type="button" className="danger" onClick={() => remove(item._id)}>
+                                        Delete
+                                    </button>
+                                </div>
+                            </article>
+                        ))}
+                        {!items.length && <p className="empty">No records yet. Create one to test the API.</p>}
+                    </div>
+                </div>
+            </section>
+        </main>
+    )
 }
 
 export default App
